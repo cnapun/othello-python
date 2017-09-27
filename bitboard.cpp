@@ -1,172 +1,50 @@
 #include <cstdint>
 #include <vector>
 #include <iostream>
+#include <Eigen/Dense>
+#include <cmath>
+#include <algorithm>
+#include <ctime>
+
 using namespace std;
+using namespace Eigen;
 
 #define UP_MASK 0xFF00000000000000
 #define DOWN_MASK 0x00000000000000FF
 #define LEFT_MASK 0x8080808080808080
 #define RIGHT_MASK 0x0101010101010101
 
-const uint64_t m1 = 0x5555555555555555;  //binary: 0101...
-const uint64_t m2 = 0x3333333333333333;  //binary: 00110011..
-const uint64_t m4 = 0x0f0f0f0f0f0f0f0f;  //binary:  4 zeros,  4 ones ...
+const uint64_t start = 0x8000000000000000;
+const uint64_t m1 = 0x5555555555555555; //binary: 0101...
+const uint64_t m2 = 0x3333333333333333; //binary: 00110011..
+const uint64_t m4 = 0x0f0f0f0f0f0f0f0f; //binary:  4 zeros,  4 ones ...
 // const uint64_t m8 = 0x00ff00ff00ff00ff;  //binary:  8 zeros,  8 ones ...
 // const uint64_t m16 = 0x0000ffff0000ffff; //binary: 16 zeros, 16 ones ...
 // const uint64_t m32 = 0x00000000ffffffff; //binary: 32 zeros, 32 ones
 // const uint64_t hff = 0xffffffffffffffff; //binary: all ones
 // const uint64_t h01 = 0x0101010101010101; //the sum of 256 to the power of 0,1,2,3...
-vector<vector<float> > Wh;
-vector<float> Wo;
+MatrixXf Wh(130,100);//it = MatrixXf::Random(130, 100); // (D,H)
+VectorXf Wo(100); //= VectorXf::Random(100);      // (H,1)
+uint64_t moved;
+int maxDepth;
+// void updateWeights(float learningRate, MatrixXf data, VectorXf rewards){
 
-// Note i have learned that this is really slow so i'll switch to eigen sometime
-float vector_vector(vector<float> v1, vector<float> v2){
-    float out = 0;
-    for (int i = 0;i<v1.size(); i++){
-        out += v1[i] * v2[i];
-    }
-    return out;
-}
+//     MatrixXf h = data * Wh;
+//     MatrixXf mask = (h.array()>0);
+//     h = h.cwiseProduct(mask);
 
-float vector_vector(vector<float> v1, vector<int> v2){
-    float out = 0;
-    for (int i = 0;i<v1.size(); i++){
-        out += v1[i] * v2[i];
-    }
-    return out;
-}
+//     VectorXf outs = h * Wo;
 
-vector<float> mat_vector(vector<vector<float> > A, vector<float> v){
-    int rows = A.size();
-    vector<float> out(rows);
-    for (int i=0;i<rows; i++){
-        out[i] = vector_vector(A[i], v);
-    }
-    return out;
-}
+//     VectorXf errs = outs - rewards;
 
-vector<float> vectorTmatrix(vector<float> v, vector<vector<float> > A){
-    vector<float> out(A[0].size());
-    for (int i = 0;i<A[0].size(); i++){
-        float sum = 0;
-        for (int j=0;j<A.size(); j++){
-            sum += v[j]*A[j][i];
-        }
-    }
-    return out;
-}
+//     MatrixXf dh = (errs * Wo.transpose()).cwiseProduct(mask);
+//     MatrixXf dWo = h.transpose() * errs;
 
-vector<vector<float> > outer(vector<float> v1, vector<float> v2){
-    vector<vector<float> > out(v1.size());
-    for (int i=0;i<v1.size();i++){\
-        vector<float> row(v2.size());
-        out[i] = row;
-        for (int j=0;j<v2.size();j++){
-            out[i][j] = v1[i]*v2[j];
-        }
-    }
-    return out;
-}
+//     MatrixXf dWh = data.transpose() * dh;
 
-vector<float> mat_vector_relu(vector<vector<float> > A, vector<int> v){
-    int rows = A.size();
-    vector<float> out(rows);
-    for (int i=0;i<rows; i++){
-        float tmp = vector_vector(A[i], v);
-        if (tmp>0){
-            out[i] = tmp;
-        }else{
-            out[i] = 0.0;
-        }
-    }
-    return out;
-}
-
-vector<vector<float> > matTmat(vector<vector<float> > A, vector<vector<int> > B){
-    vector<vector<float> > out(A[0].size());
-    for (int i=0;i<A[0].size(); i++){
-        vector<float> row(B[0].size());
-        out[i] = row;
-        for (int j=0;j<B[0].size(); j++){
-            out[i][j]=0;
-            for (int k=0;k<A.size();k++){
-                out[i][j] += A[k][i]*B[k][j];
-            }
-        }
-    }
-    return out;
-}
-
-void updateWeights(float learningRate, vector<vector<int> > data, vector<float> rewards){
-
-    vector<vector<float> > h(data.size());
-    for (int i =0;i<data.size();i++){
-        h[i] = mat_vector_relu(Wh, data[i]);
-    }
-
-    vector<float> outs = mat_vector(h, Wo);
-    
-    vector<float> errs(outs.size());
-    for (int i = 0;i<outs.size(); i++){
-        errs[i] = outs[i] - rewards[i]; //note this negative here. it's gradient descent
-    }
-
-    vector<vector<float> > dh = outer(errs, Wo);
-
-    vector<float> dWo = vectorTmatrix(errs, h); // yay gradients
-
-    // backprop a bit more
-    for (int i=0;i<dh.size();i++){
-        for (int j=0;j<dh[0].size(); j++){
-            if (h[i][j]==0){
-                dh[i][j]=0;
-            }
-        }
-    }
-
-    vector<vector<float> > dWh = matTmat(dh, data);
-    
-    for (int i=0;i<Wo.size();i++){
-        Wo[i] -= dWo[i]*learningRate;
-    }
-    for (int i=0;i<Wo.size();i++){
-        for (int j=0;j<Wh[0].size();j++){
-            Wh[i][j] -= dWh[i][j]*learningRate;
-        }
-    }
-}
-
-vector<int> toVector(uint64_t board){
-    vector<int> out(64);
-    uint64_t pos = 0x8000000000000000;
-    for (int i=0;i<64;i++){
-        out[i] = (pos & board)!=0;
-        pos >>= 1;
-    }
-    return out;
-}
-
-vector<int> doubleToVector(uint64_t p1, uint64_t p2){
-    vector<int> out(128);
-    uint64_t pos = 0x8000000000000000;
-    for (int i=0;i<64;i++){
-        out[i] = (pos & p1)!=0;
-        out[i+64] = (pos & p2)!=0;
-        pos >>= 1;
-    }
-    return out;
-}
-
-float heuristic(uint64_t p1, uint64_t p2){
-    vector<int> input = doubleToVector(p1, p2);
-    vector<float> h = mat_vector_relu(Wh, input);
-    return vector_vector(Wo, h);
-}
-
-int main(){
-    cout << "Hi";
-    return 0;
-}
+//     Wh -= learningRate * dWh;
+//     Wo -= learningRate * dWo;
+// }
 
 uint64_t shift_up(uint64_t board)
 {
@@ -296,7 +174,7 @@ uint64_t dr_moves(uint64_t p1, uint64_t p2)
     return res;
 }
 
-uint64_t moves(uint64_t p1, uint64_t p2)
+extern "C" uint64_t moves(uint64_t p1, uint64_t p2)
 {
     // could just call thos functions above but I have this so i'll keep it
     uint64_t res = 0;
@@ -329,7 +207,7 @@ uint64_t moves(uint64_t p1, uint64_t p2)
     return res;
 }
 
-int board_x(uint64_t move)
+extern "C" int board_x(uint64_t move)
 {
     if (move == 0)
     {
@@ -345,7 +223,7 @@ int board_x(uint64_t move)
     return i;
 }
 
-int board_y(uint64_t move)
+extern "C" int board_y(uint64_t move)
 {
     if (move == 0)
     {
@@ -361,7 +239,7 @@ int board_y(uint64_t move)
     return i;
 }
 
-uint64_t move_player(uint64_t move, uint64_t p1, uint64_t p2)
+extern "C" uint64_t move_player(uint64_t move, uint64_t p1, uint64_t p2)
 {
     uint64_t full = 0;
     uint64_t empty = ~(p1 | move | p2);
@@ -575,7 +453,7 @@ uint64_t move_player(uint64_t move, uint64_t p1, uint64_t p2)
     return ((full & p2) | p1 | move);
 }
 
-int bitCount(uint64_t x)
+extern "C" int bitCount(uint64_t x)
 {
     x -= (x >> 1) & m1;             //put count of each 2 bits into those 2 bits
     x = (x & m2) + ((x >> 2) & m2); //put count of each 4 bits into those 4 bits
@@ -586,7 +464,7 @@ int bitCount(uint64_t x)
     return x & 0x7f;
 }
 
-int endofGame(uint64_t p1, uint64_t p2)
+extern "C" int endofGame(uint64_t p1, uint64_t p2)
 {
     uint64_t p1moves = moves(p1, p2);
     uint64_t p2moves = moves(p2, p1);
@@ -615,3 +493,151 @@ int endofGame(uint64_t p1, uint64_t p2)
     }
 }
 
+vector<uint64_t> toList(uint64_t board)
+{
+    vector<uint64_t> out;
+    uint64_t pos = start;
+    while (pos > 0)
+    {
+        uint64_t tmp = pos & board;
+        if (tmp != 0)
+        {
+            out.push_back(tmp);
+        }
+        pos >>=1;
+    }
+    return out;
+}
+
+VectorXi toVector(uint64_t board)
+{
+    VectorXi out(64);
+    uint64_t pos = 0x8000000000000000;
+    for (int i = 0; i < 64; i++)
+    {
+        out(i) = (pos & board) != 0;
+        pos >>= 1;
+    }
+    return out;
+}
+VectorXi doubleToVector(uint64_t p1, uint64_t p2)
+{
+    VectorXi out(130);
+    uint64_t pos = start;
+    for (int i = 0; i < 64; i++)
+    {
+        out(i) = (pos & p1) != 0;
+        out(i + 64) = (pos & p2) != 0;
+        pos >>= 1;
+    }
+    out(128) = bitCount(moves(p1, p2));
+    out(129) = bitCount(moves(p2, p1));
+    return out;
+}
+
+float heuristic(uint64_t p1, uint64_t p2, bool add_noise)
+{
+    VectorXf input = doubleToVector(p1, p2).cast<float>();
+    VectorXf h0 = Wh.transpose() * input;
+    VectorXf h = (h0.array() * (h0.array() > 0).cast<float>()).matrix();
+    if (add_noise){}
+    return h.dot(Wo);
+}
+
+void setWs(float *hPointer, float *oPointer)
+{
+    Wh = Map<Matrix<float, 100, 130> >(hPointer).transpose();
+    Wo = Map<Matrix<float, 100, 1>  >(hPointer);
+}
+
+double alphaBeta(uint64_t p1, uint64_t p2, int depth, double alpha, double beta, bool maxer, bool add_noise)
+{
+    int eog = endofGame(p1, p2);
+    if (eog == 3)
+    {
+        return 0.0;
+    }
+    else if (eog == 2)
+    {
+        return -10000000000.0;
+    }
+    else if (eog == 1)
+    {
+        return 10000000000.0;
+    }
+    if (depth == 0)
+    {
+        return heuristic(p1, p2, add_noise);
+    }
+    uint64_t mv = moves(p1, p2);
+    // cout << mv;
+    if (mv == 0)
+    {
+        return alphaBeta(p2, p1, depth, alpha, beta, !maxer, add_noise);
+    }
+    vector<uint64_t> a = toList(mv);
+    if (maxer)
+    {
+        double v = -INFINITY;
+        for (int i = 0; i < a.size(); i++)
+        {
+            uint64_t move = a[i];
+            uint64_t newp1 = move_player(move, p1, p2);
+            uint64_t newp2 = p2 & ~p1;
+            double y = alphaBeta(newp2, newp1, depth - 1, alpha, beta, false, add_noise);
+            if (y > v && depth == maxDepth)
+            {
+                moved = move;
+            }
+            v = max(y, v);
+            alpha = max(alpha, v);
+            if (beta <= alpha)
+            {
+                break;
+            }
+        }
+        return v;
+    }
+    else
+    {
+        double v = INFINITY;
+        for (int i = 0; i < a.size(); i++)
+        {
+            uint64_t move = a[i];
+            uint64_t newp1 = move_player(move, p1, p2);
+            uint64_t newp2 = p2 & ~p1;
+            double y = alphaBeta(newp2, newp1, depth - 1, alpha, beta, true, add_noise);
+            v = min(y, v);
+            beta = min(beta, v);
+            if (beta <= alpha)
+            {
+                break;
+            }
+        }
+        return v;
+    }
+}
+
+uint64_t bestMove(uint64_t p1, uint64_t p2, int max_depth, bool add_noise)
+{
+    moved = 0;
+    maxDepth = max_depth;
+    alphaBeta(p1, p2, maxDepth, -INFINITY, INFINITY, true, add_noise);
+    return moved;
+}
+
+extern "C" uint64_t doEverything(uint64_t p1, uint64_t p2, int max_depth, bool add_noise, float *hPointer, float *oPointer){
+    setWs(hPointer, oPointer);
+    return bestMove(p1, p2, max_depth, add_noise);
+}
+
+int main(){
+    uint64_t p1 = 0x0000000810000000;
+    uint64_t p2 = 0x0000001008000000;
+    clock_t begin = clock();    
+    cout << bestMove(p1, p2, 8, false);
+    clock_t end = clock();
+    cout<<"\n";
+    cout<<double(end - begin) / CLOCKS_PER_SEC;    
+    return 0;
+}

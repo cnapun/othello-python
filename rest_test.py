@@ -4,7 +4,7 @@ from flask_cors import CORS
 from BB import *
 
 l = Learner(4)
-l.load_weights('good_weights')
+l.load_weights('weights2_reg_100')
 bb = Bitboard(4, l.heuristic)
 
 app = Flask(__name__)
@@ -54,7 +54,6 @@ def get_task():
     moves = bb.to_array(bb.moves()).reshape(8,8)
     response = jsonify({'white':[{'x':int(j), 'y':int(i)} for i,j in zip(*np.where(p2!=0))], 'black':[{'x':int(j), 'y':int(i)} for i,j in zip(*np.where(p1!=0))], 'eg':eg, 'moves':[{'x':int(j), 'y':int(i)} for i,j in zip(*np.where(moves!=0))]})
     response.status_code = 200
-    # print(data)
     return response
 
 if __name__ == '__main__':

@@ -3,6 +3,7 @@ weight*
 *.ipynb
 *.iml
 *.pyc
+*.out
 
 .vscode/
 testlib1.so

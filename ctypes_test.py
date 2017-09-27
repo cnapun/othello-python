@@ -1,41 +1,43 @@
 import ctypes
 import os
+from numpy.ctypeslib import ndpointer
 
-_file = 'testlib.so'
+
+_file = 'testlib1.so'
 _path = os.path.join(*(os.path.split(__file__)[:-1] + (_file,)))
 _mod = ctypes.cdll.LoadLibrary(_path)
 
-up_moves = _mod.up_moves
-up_moves.argtypes = (ctypes.c_uint64, ctypes.c_uint64)
-up_moves.restype = ctypes.c_uint64
+# up_moves = _mod.up_moves
+# up_moves.argtypes = (ctypes.c_uint64, ctypes.c_uint64)
+# up_moves.restype = ctypes.c_uint64
 
-down_moves = _mod.down_moves
-down_moves.argtypes = (ctypes.c_uint64, ctypes.c_uint64)
-down_moves.restype = ctypes.c_uint64
+# down_moves = _mod.down_moves
+# down_moves.argtypes = (ctypes.c_uint64, ctypes.c_uint64)
+# down_moves.restype = ctypes.c_uint64
 
-left_moves = _mod.left_moves
-left_moves.argtypes = (ctypes.c_uint64, ctypes.c_uint64)
-left_moves.restype = ctypes.c_uint64
+# left_moves = _mod.left_moves
+# left_moves.argtypes = (ctypes.c_uint64, ctypes.c_uint64)
+# left_moves.restype = ctypes.c_uint64
 
-right_moves = _mod.right_moves
-right_moves.argtypes = (ctypes.c_uint64, ctypes.c_uint64)
-right_moves.restype = ctypes.c_uint64
+# right_moves = _mod.right_moves
+# right_moves.argtypes = (ctypes.c_uint64, ctypes.c_uint64)
+# right_moves.restype = ctypes.c_uint64
 
-ur_moves = _mod.ur_moves
-ur_moves.argtypes = (ctypes.c_uint64, ctypes.c_uint64)
-ur_moves.restype = ctypes.c_uint64
+# ur_moves = _mod.ur_moves
+# ur_moves.argtypes = (ctypes.c_uint64, ctypes.c_uint64)
+# ur_moves.restype = ctypes.c_uint64
 
-ul_moves = _mod.ul_moves
-ul_moves.argtypes = (ctypes.c_uint64, ctypes.c_uint64)
-ul_moves.restype = ctypes.c_uint64
+# ul_moves = _mod.ul_moves
+# ul_moves.argtypes = (ctypes.c_uint64, ctypes.c_uint64)
+# ul_moves.restype = ctypes.c_uint64
 
-dr_moves = _mod.dr_moves
-dr_moves.argtypes = (ctypes.c_uint64, ctypes.c_uint64)
-dr_moves.restype = ctypes.c_uint64
+# dr_moves = _mod.dr_moves
+# dr_moves.argtypes = (ctypes.c_uint64, ctypes.c_uint64)
+# dr_moves.restype = ctypes.c_uint64
 
-dl_moves = _mod.dl_moves
-dl_moves.argtypes = (ctypes.c_uint64, ctypes.c_uint64)
-dl_moves.restype = ctypes.c_uint64
+# dl_moves = _mod.dl_moves
+# dl_moves.argtypes = (ctypes.c_uint64, ctypes.c_uint64)
+# dl_moves.restype = ctypes.c_uint64
 
 moves = _mod.moves
 moves.argtypes = (ctypes.c_uint64, ctypes.c_uint64)
@@ -60,3 +62,7 @@ bc.restype = ctypes.c_int
 end_of_game = _mod.endofGame
 end_of_game.argtypes = (ctypes.c_uint64, ctypes.c_uint64)
 end_of_game.restype = ctypes.c_int
+
+do_everything = _mod.doEverything
+do_everything.argtypes = (ctypes.c_uint64, ctypes.c_uint64, ctypes.c_int, ctypes.c_bool, ndpointer(ctypes.c_float, flags="C_CONTIGUOUS"),ndpointer(ctypes.c_float, flags="C_CONTIGUOUS"))
+do_everything.restype = ctypes.c_uint64
