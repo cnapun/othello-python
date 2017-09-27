@@ -4,7 +4,7 @@ from flask_cors import CORS
 from BB import *
 
 l = Learner(4)
-l.load_weights('weights1_100')
+l.load_weights('good_weights')
 bb = Bitboard(4, l.heuristic)
 
 app = Flask(__name__)

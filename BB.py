@@ -17,9 +17,9 @@ class Bitboard:
     def __str__(self):
         pos = 0x8000000000000000
         a = []
-        for i in range(8):
+        for _ in range(8):
             b = []
-            for i in range(8):
+            for _ in range(8):
                 if pos & self.p1:
                     b.append('1')
                 elif pos & self.p2:
@@ -34,9 +34,9 @@ class Bitboard:
     @staticmethod
     def print_board(board):
         pos = 0x8000000000000000
-        for i in range(8):
+        for _ in range(8):
             a = []
-            for i in range(8):
+            for _ in range(8):
                 if pos & board != 0:
                     a.append('1')
                 else:
@@ -139,8 +139,9 @@ class Bitboard:
                 newp1 = move_player(move, p1, p2)
                 newp2 = p2 & ~newp1
                 # nd = depth-1 if len(a)>2 else depth
-                nd = depth-1
-                y = self._alphabeta(newp2, newp1, nd, alpha, beta, False, add_noise)
+                nd = depth - 1
+                y = self._alphabeta(newp2, newp1, nd, alpha,
+                                    beta, False, add_noise)
                 if y > v and depth == self.maxdepth:
                     self.moved = move
                 v = max(v, y)
@@ -154,8 +155,9 @@ class Bitboard:
                 newp1 = move_player(move, p1, p2)
                 newp2 = p2 & ~newp1
                 # nd = depth-1 if len(a)>2 else depth
-                nd = depth-1
-                y = self._alphabeta(newp2, newp1, nd, alpha, beta, True, add_noise)
+                nd = depth - 1
+                y = self._alphabeta(newp2, newp1, nd, alpha,
+                                    beta, True, add_noise)
                 v = min(v, y)
                 beta = min(beta, v)
                 if beta <= alpha:
@@ -173,10 +175,10 @@ class Learner:
         self.opt_cache = [np.zeros_like(self.wh), np.zeros_like(self.wo)]
 
     def heuristic(self, p1, p2, add_noise=True):
-        if self.wh.shape[0]==130:
+        if self.wh.shape[0] == 130:
             x = np.concatenate(
                 (Bitboard.to_array(p1), Bitboard.to_array(p2), [bc(moves(p1, p2))], [bc(moves(p2, p1))]))
-        elif self.wh.shape[0]==129:
+        elif self.wh.shape[0] == 129:
             x = np.concatenate(
                 (Bitboard.to_array(p1), Bitboard.to_array(p2), [bc(moves(p1, p2))]))
         else:
@@ -184,7 +186,7 @@ class Learner:
                 (Bitboard.to_array(p1), Bitboard.to_array(p2)))
         h = x @ self.wh
         if add_noise:
-            h += 0.1 * np.random.randn(*h.shape)
+            h += 0.07 * np.random.randn(*h.shape)
         h = np.maximum(h, 0)
         pred = self.wo @ h
         return pred
@@ -200,7 +202,7 @@ class Learner:
         preds = h @ self.wo
 
         # backward
-        dwo = h.T @ rewards
+        dwo = h.T @ (preds - rewards)/len(rewards)
         dwh = data.T @ (np.outer(rewards, self.wo) * mask)
         if np.abs(dwo).sum() > 1000000:
             self.save_weights('bad_weights')
@@ -209,8 +211,8 @@ class Learner:
         self.opt_cache[0] += 0.1 * dwh**2
         self.opt_cache[1] *= 0.9
         self.opt_cache[1] += 0.1 * dwo**2
-        self.wh += lr * dwh / np.sqrt(self.opt_cache[0] + 1e-8)
-        self.wo += lr * dwo / np.sqrt(self.opt_cache[1] + 1e-8)
+        self.wh -= lr * dwh / np.sqrt(self.opt_cache[0] + 1e-8)
+        self.wo -= lr * dwo / np.sqrt(self.opt_cache[1] + 1e-8)
 
     def save_weights(self, path):
         if not os.path.exists(path):
@@ -229,7 +231,7 @@ class Learner:
         self.wo = np.fromfile('%s/wo' % path).reshape(self.wh.shape[1])
 
     def move(self, bb, add_noise=True):
-        move = bb.best_move(add_noise)
+        move = bb.best_move(self.max_depth, add_noise)
         eg = bb.make_move(move)
 
         if bb.p1turn:
@@ -264,13 +266,14 @@ class Learner:
         return bb
 
     def prepare_numpy(self):
-        training_data = np.array([(Bitboard.to_array(p1).reshape(8,8), Bitboard.to_array(p2).reshape(8,8)) for p1, p2 in self.p1_moves] + [
-                                 (Bitboard.to_array(p2).reshape(8,8), Bitboard.to_array(p1).reshape(8,8)) for p2, p1 in self.p2_moves])
-        training_data = np.concatenate([np.rot90(training_data, k, (-2,-1)) for k in range(4)], 0).reshape(-1, 8 * 8 * 2)
+        training_data = np.array([(Bitboard.to_array(p1).reshape(8, 8), Bitboard.to_array(p2).reshape(8, 8)) for p1, p2 in self.p1_moves] + [
+                                 (Bitboard.to_array(p2).reshape(8, 8), Bitboard.to_array(p1).reshape(8, 8)) for p2, p1 in self.p2_moves])
+        training_data = np.concatenate(
+            [np.rot90(training_data, k, (-2, -1)) for k in range(4)], 0).reshape(-1, 8 * 8 * 2)
 
         mcs = np.array([(bc(moves(p1, p2)), bc(moves(p2, p1))) for p1, p2 in self.p1_moves] +
                        [(bc(moves(p2, p1)), bc(moves(p1, p2))) for p2, p1 in self.p2_moves])
-        mcs = np.tile(mcs, (4,1))
+        mcs = np.tile(mcs, (4, 1))
 
         training_data = np.append(training_data, mcs, 1)
         p1_rewards = self.reward[0] * \
@@ -278,7 +281,7 @@ class Learner:
         p2_rewards = self.reward[1] * \
             (0.99**np.arange(len(self.p2_moves)))[::-1]
         rewards = np.append(p1_rewards, p2_rewards)
-        sd = rewards.std() * 4
+        sd = rewards.std() 
         mean = rewards.mean()
         if sd < 1e-6:
             sd = 100000000
@@ -316,17 +319,18 @@ if __name__ == '__main__':
     # l.load_weights('weights')
     # bb = Bitboard(4, heuristic=l.heuristic)
 
-    a = Learner(1, 100)
+    a = Learner(2, 100)
     # a.load_weights('weights_reproduce_100')
     # a.play_and_update()
-    print('weights_reproduce_100')
+    print('weights2_reg_100')
 
-    for i in range(1, 500000 + 1):
+    for i in range(1, 100000 + 1):
         start = time.time()
         bb = a.play_and_update()
         end = time.time()
-        if i % 500 == 0:
+        if i % 100 == 0:
             print(f'Iteration {i}: {end-start:.3f}s')
-            sys.stdout.flush()
-            a.save_weights('weights_reproduce_100')
+            # assert False
+            # sys.stdout.flush()
+            a.save_weights('weights2_reg_100')
     # a.save_weights('weights')
